@@ -1,0 +1,25 @@
+{
+  "totalFrames": 120,
+  "poses": {
+    "idle": {
+      "range": [1, 15],
+      "message": "Hey, I'm Nova 👋"
+    },
+    "point": {
+      "range": [16, 40],
+      "message": "Check this out!"
+    },
+    "think": {
+      "range": [41, 65],
+      "message": "Let me think about that..."
+    },
+    "wave": {
+      "range": [66, 90],
+      "message": "Great to see you here!"
+    },
+    "excited": {
+      "range": [91, 120],
+      "message": "This is my favorite part!"
+    }
+  }
+}
