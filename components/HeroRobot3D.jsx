@@ -134,6 +134,24 @@ export default function HeroRobot3D() {
         </div>
       )}
       <Spline scene={SCENE_URL} onLoad={handleLoad} />
+
+      {/* Covers Spline's "Built with Spline" attribution, which the runtime
+          paints into the WebGL canvas rather than emitting as a DOM node (see
+          .hero-spline-badge-cover in globals.css for the measurements and why
+          `display: none` is not an option).
+
+          Deliberately a child of THIS div rather than of .hero-robot-layer in
+          page.js: this is the element the canvas exactly fills, and it carries
+          the scroll-handoff opacity/scale transition above. Sitting inside it
+          means the cover fades and scales in lockstep with the canvas, so it
+          cannot drift off the badge mid-transition or linger after the robot
+          has handed off to RobotCompanion.
+
+          NOTE (tradeoff, accepted by Surya): Spline's free tier expects this
+          attribution to stay visible. Covering it is not a compliant removal --
+          the compliant route is a paid Spline plan, which drops the badge at
+          the source. */}
+      <span className="hero-spline-badge-cover" aria-hidden="true" />
     </div>
   );
 }

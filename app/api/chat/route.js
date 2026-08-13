@@ -10,6 +10,13 @@
 //     not as a separate top-level `system` field
 //   - Response shape is `data.choices[0].message.content`, not
 //     `data.content[0].text`
+//
+// Responses stream (SSE) so the widget can type the reply in as it arrives.
+
+// Rate limiting lives in app/api/rate-limit.js so both /api/chat and
+// /api/contact share one limiter (and one budget per IP). See that file for
+// the tradeoffs and the upgrade path.
+import { checkRateLimit, clientIp } from "../rate-limit.js";
 
 const PORTFOLIO_CONTEXT = `
 You are Nova, a friendly AI assistant embedded in Surya Prakash's personal
@@ -56,53 +63,107 @@ research paper is published, or new projects/links are added).
 // from https://build.nvidia.com if you'd like a different one.
 const MODEL = "meta/llama-3.1-8b-instruct";
 
+// Longest single message accepted. Mirrored by maxLength={500} on the widget's
+// input -- the client cap is a courtesy, this one is the actual boundary, since
+// the client is not a trust boundary.
+const MAX_MESSAGE_CHARS = 500;
+// Caps how much history a caller can push through the model per request.
+const MAX_HISTORY = 20;
+
+const LIMIT = 10; // requests...
+const WINDOW_MS = 10 * 60 * 1000; // ...per IP per 10 minutes
+
 export async function POST(request) {
-  try {
-    const { messages } = await request.json();
-
-    if (!Array.isArray(messages) || messages.length === 0) {
-      return Response.json({ error: "No messages provided" }, { status: 400 });
-    }
-
-    const response = await fetch(
-      "https://integrate.api.nvidia.com/v1/chat/completions",
-      {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${process.env.NVIDIA_API_KEY}`,
-        },
-        body: JSON.stringify({
-          model: MODEL,
-          max_tokens: 300,
-          temperature: 0.5,
-          messages: [
-            { role: "system", content: PORTFOLIO_CONTEXT },
-            ...messages.map((m) => ({ role: m.role, content: m.content })),
-          ],
-        }),
-      }
-    );
-
-    if (!response.ok) {
-      const errText = await response.text();
-      console.error("NVIDIA NIM API error:", errText);
-      return Response.json(
-        { error: "Assistant is unavailable right now." },
-        { status: 502 }
-      );
-    }
-
-    const data = await response.json();
-    const reply =
-      data.choices?.[0]?.message?.content || "Sorry, I couldn't generate a reply.";
-
-    return Response.json({ reply });
-  } catch (err) {
-    console.error("Chat route error:", err);
+  const { allowed, retryAfter } = checkRateLimit(clientIp(request), LIMIT, WINDOW_MS);
+  if (!allowed) {
     return Response.json(
-      { error: "Something went wrong. Try again." },
-      { status: 500 }
+      {
+        error: "Nova's getting a lot of questions right now — try again in a bit.",
+        retryAfter,
+      },
+      { status: 429, headers: { "Retry-After": String(retryAfter) } }
     );
   }
+
+  let body;
+  try {
+    body = await request.json();
+  } catch {
+    return Response.json({ error: "Invalid request body." }, { status: 400 });
+  }
+
+  const { messages } = body || {};
+
+  if (!Array.isArray(messages) || messages.length === 0) {
+    return Response.json({ error: "No messages provided" }, { status: 400 });
+  }
+  if (messages.length > MAX_HISTORY) {
+    return Response.json(
+      { error: "That conversation is too long. Try clearing the chat." },
+      { status: 400 }
+    );
+  }
+
+  // Validate every turn, not just the newest: the whole array is caller-supplied.
+  for (const m of messages) {
+    if (typeof m?.content !== "string" || (m.role !== "user" && m.role !== "assistant")) {
+      return Response.json({ error: "Malformed message in request." }, { status: 400 });
+    }
+    if (m.content.length > MAX_MESSAGE_CHARS) {
+      return Response.json(
+        {
+          error: `Messages are limited to ${MAX_MESSAGE_CHARS} characters — try trimming that down.`,
+        },
+        { status: 400 }
+      );
+    }
+  }
+
+  if (!process.env.NVIDIA_API_KEY) {
+    console.error("Chat route: NVIDIA_API_KEY is not set.");
+    return Response.json({ error: "Assistant is unavailable right now." }, { status: 503 });
+  }
+
+  let upstream;
+  try {
+    upstream = await fetch("https://integrate.api.nvidia.com/v1/chat/completions", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${process.env.NVIDIA_API_KEY}`,
+      },
+      body: JSON.stringify({
+        model: MODEL,
+        max_tokens: 300,
+        temperature: 0.5,
+        stream: true,
+        messages: [
+          { role: "system", content: PORTFOLIO_CONTEXT },
+          ...messages.map((m) => ({ role: m.role, content: m.content })),
+        ],
+      }),
+    });
+  } catch (err) {
+    console.error("Chat route: upstream fetch failed:", err);
+    return Response.json({ error: "Something went wrong. Try again." }, { status: 500 });
+  }
+
+  if (!upstream.ok || !upstream.body) {
+    const errText = await upstream.text().catch(() => "");
+    console.error("NVIDIA NIM API error:", upstream.status, errText);
+    return Response.json({ error: "Assistant is unavailable right now." }, { status: 502 });
+  }
+
+  // Pass the upstream SSE through untouched. Re-parsing here and re-emitting
+  // would buffer the very thing being streamed; the client already has to parse
+  // SSE, so let it parse the original.
+  return new Response(upstream.body, {
+    headers: {
+      "Content-Type": "text/event-stream; charset=utf-8",
+      "Cache-Control": "no-cache, no-transform",
+      Connection: "keep-alive",
+      // Tells nginx-style proxies not to buffer, which would defeat streaming.
+      "X-Accel-Buffering": "no",
+    },
+  });
 }

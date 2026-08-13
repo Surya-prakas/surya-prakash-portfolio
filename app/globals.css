@@ -7,6 +7,10 @@
 :root {
   /* Palette derived from Nova's character design, not a generic default */
   --bg: #0a0b0a;
+  /* Darker than --bg on purpose: the recessed "screen" fill for TerminalHero,
+     which should read as inset into the page rather than raised off it like the
+     --surface-1 cards. Slots below --bg in the ladder (0 < bg < 1 < 2). */
+  --surface-0: #050605;
   --surface-1: #111312;
   --surface-2: #171a19;
   --border: #262a28;
@@ -23,6 +27,16 @@
 
   --font-sans: var(--font-geist-sans), -apple-system, sans-serif;
   --font-mono: var(--font-geist-mono), ui-monospace, monospace;
+
+  /* Heading scale: 32 / 20 / 16 / 12-mono, by hierarchy level rather than by
+     section. The two tiers below are the ones that repeat, so they're named --
+     four sections had drifted to 20/18/16/15 for the same structural level.
+     `card-title` is for titles inside a rich .card (Projects, Experience);
+     `row-title` is for lightweight borderless rows (FAQ, Education). The hero
+     h1 (32), .eyebrow (12) and the cinematic intro's display type are one-offs
+     tied to their context and stay inline. */
+  --text-card-title: 20px;
+  --text-row-title: 16px;
 }
 
 * {
@@ -115,6 +129,157 @@ input {
   display: inline-block;
 }
 
+/* --- Hero ghost word ------------------------------------------------------
+   The oversized "SURYA" sitting behind the Spline robot. Deliberately matched
+   to CinematicNovaIntro's .nova-ghost-word (same font, weight, tracking and
+   0.05 opacity) so the hero and the cinematic section immediately below it
+   read as the same device rather than two unrelated background treatments.
+
+   Static rather than crossfading -- there is only one word here, so none of
+   the per-chapter opacity machinery applies. */
+.hero-stage {
+  position: relative;
+  /* Own stacking context, so the ghost's z-index resolves against the robot
+     and cannot escape to interact with the terminal card below. */
+  isolation: isolate;
+}
+
+.hero-robot-layer {
+  position: relative;
+  z-index: 1; /* above the ghost */
+}
+
+.hero-ghost-word {
+  position: absolute;
+  z-index: 0; /* behind the robot, above the page background */
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  /* The robot's painted centre measures 268px against a container centre of
+     276px -- an 8px delta on a 360px band -- so plain centring is already
+     correct to within 2%. No hand-tuned offset: the robot's position is a
+     property of the Spline scene, and a magic number here would silently go
+     stale the next time that scene is re-exported. */
+
+  font-family: var(--font-sans);
+  font-weight: 800;
+  letter-spacing: -0.04em;
+  line-height: 1;
+  color: var(--text-primary);
+  opacity: 0.05;
+  white-space: nowrap;
+  pointer-events: none; /* never intercepts the Spline canvas's drag/click */
+  user-select: none;
+
+  /* Sized to fill the CONTENT COLUMN at every width, rather than to the
+     viewport. .container is min(880px, 100vw) wide with 24px of padding each
+     side, so this is exactly the font-size whose rendered word spans the
+     column: no overflow to clip at any width, and no horizontal page scrollbar.
+
+     This lands at 18vw on a 1440px screen and ~27vw at 390px -- it scales UP as
+     the viewport narrows, closely mirroring .nova-ghost-word's own 19vw -> 26vw
+     step at its 1279px breakpoint. A plain `20vw` was tried first and does the
+     opposite: at 390px it shrank the word to 250px against a ~155px-wide robot,
+     which left it almost entirely hidden behind the robot instead of reading as
+     a backdrop.
+
+     3.21 is the MEASURED width of "SURYA" in Geist Sans 800 at -0.04em, in em
+     (probe-hero-ghost.mjs reports measuredEmPerWord). An estimated 2.9
+     overflowed the column by 88px -- this ratio depends on the font's own
+     metrics, so re-measure if the word, weight or tracking change. */
+  font-size: calc((min(880px, 100vw) - 48px) / 3.21);
+
+  /* Entrance, then a continuous breathe. Both are listed on one element, and
+     both touch `opacity` -- when two animations animate the same property the
+     LAST one in the list wins, so `breathe` must come second or the entrance's
+     `both` fill would pin opacity at its end value forever and nothing would
+     pulse. The 1.1s delay means breathe simply doesn't apply until the entrance
+     is done, so there is no fight during the first cycle.
+
+     Only `hero-ghost-in` touches `transform`; breathe is opacity-only, which
+     both keeps it off the compositor's layout path and leaves the entrance's
+     held `scale(1)` intact instead of resetting it every 4.5s. */
+  animation: hero-ghost-in 1.1s ease-out both,
+             hero-ghost-breathe 4.5s 1.1s ease-in-out infinite;
+}
+
+/* Matches the hero's existing entrance feel: HeroRobot3D fades and scales in
+   over 0.5s, so the backdrop settles slightly slower, behind it.
+
+   Ends at 0.04 rather than 0.05 so it hands off to breathe's 0% with no step:
+   0.05 -> 0.04 is only ~2/255 on this backdrop and would not be visible, but
+   matching them costs nothing and keeps the two keyframe sets readable as one
+   continuous motion. The static 0.05 above is still what non-animated and
+   reduced-motion renders use. */
+@keyframes hero-ghost-in {
+  from {
+    opacity: 0;
+    transform: translate(-50%, -50%) scale(1.04);
+  }
+  to {
+    opacity: 0.04;
+    transform: translate(-50%, -50%) scale(1);
+  }
+}
+
+/* Nova's "breathing" idle, borrowed for the backdrop: slow enough to read as
+   alive rather than as a blink. The 0.04..0.09 swing stays inside the same
+   low-opacity band the word already occupied, so the pulse changes the word's
+   presence, never its role -- at 0.09 it is still texture, not content.
+   ease-in-out (not linear) so it lingers at both extremes the way a breath
+   does; a linear ramp reads as a mechanical fade. */
+@keyframes hero-ghost-breathe {
+  0%,
+  100% {
+    opacity: 0.04;
+  }
+  50% {
+    opacity: 0.09;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  /* `animation: none` drops BOTH the entrance and the breathe, and the static
+     opacity below is what remains -- the global rule only collapses durations,
+     which for an `infinite` breathe would still leave the word oscillating (at
+     0.01ms per cycle) rather than at rest. */
+  .hero-ghost-word {
+    animation: none;
+    opacity: 0.05;
+  }
+}
+
+/* Covers the "Built with Spline" attribution the Spline runtime paints INTO the
+   WebGL canvas. There is no DOM node to hide: probe-spline-dom.mjs reports
+   .hero-robot-layer is div>div>canvas, zero iframes, zero shadow roots, and zero
+   elements matching /spline/i in text or href -- so `display: none` has no
+   target and the only CSS-reachable option is to cover those pixels.
+
+   Geometry is measured, not guessed (probe-spline-dom.mjs badgePixelBox): the
+   pill is 137x36 inset 20px from the canvas's right and bottom edges, and is
+   the SAME size at 1440, 1024 and 390 -- the runtime draws it at a fixed size in
+   the corner rather than scaling it with the canvas, so fixed px here is correct
+   and a responsive size would be wrong. 149x48 at a 14px inset is that box plus
+   6px of margin on every side, for antialiasing and any future nudge in
+   Spline's own padding.
+
+   var(--bg) is exactly the backdrop it sits on (#0a0b0a; the ghost probe
+   measures the painted backdrop as rgb(10,11,10)), so the patch is invisible.
+   If the hero ever gains a gradient or texture behind the canvas, this becomes a
+   visible rectangle and needs to match that instead. */
+.hero-spline-badge-cover {
+  position: absolute;
+  right: 14px;
+  bottom: 14px;
+  width: 149px;
+  height: 48px;
+  background: var(--bg);
+  /* Never steals a drag or click from the Spline canvas -- the cover is purely
+     a painted patch. Clicks in this corner still reach the scene, exactly as
+     they did before it existed. */
+  pointer-events: none;
+}
+
 .card {
   background: var(--surface-1);
   border: 1px solid var(--border);
@@ -129,6 +294,151 @@ input {
   box-shadow: 0 12px 32px rgba(0, 0, 0, 0.35);
 }
 
+/* --- Star border ----------------------------------------------------------
+   Adapted from React Bits' "Star Border" (see components/StarBorder.jsx). Two
+   radial-gradient sweeps run along the top and bottom edges; the wrapper clips
+   them and shows only its own 1px padding, so the visible result is a light
+   travelling around a hairline ring. Used on the featured project card only. */
+.star-border {
+  position: relative;
+  /* 1px past .card's 14px, so the ring stays concentric with the card's corners
+     instead of cutting across them. */
+  border-radius: 15px;
+  padding: 1px;
+  overflow: hidden;
+  /* Base ring beneath the sweeps. --border is the card's own border colour, so
+     between passes the edge reads as an ordinary card edge rather than a gap. */
+  background: var(--border);
+}
+
+.star-border-sweep {
+  position: absolute;
+  width: 300%;
+  /* Fixed, not upstream's `height: 50%` -- see the note in StarBorder.jsx: on a
+     ~700px card, 50% would park the gradient's bright centre far inside the
+     card and the 1px ring would only catch its falloff. */
+  height: 24px;
+  border-radius: 50%;
+  opacity: 0.7;
+  z-index: 0;
+  pointer-events: none;
+  background: radial-gradient(circle, var(--accent-teal-pale), transparent 10%);
+}
+
+.star-border-sweep--top {
+  top: -12px;
+  left: -250%;
+  animation: star-border-sweep-top 6s linear infinite alternate;
+}
+
+.star-border-sweep--bottom {
+  bottom: -12px;
+  right: -250%;
+  animation: star-border-sweep-bottom 6s linear infinite alternate;
+}
+
+.star-border-inner {
+  position: relative;
+  z-index: 1;
+}
+
+@keyframes star-border-sweep-top {
+  0% {
+    transform: translateX(0);
+    opacity: 1;
+  }
+  100% {
+    transform: translateX(100%);
+    opacity: 0;
+  }
+}
+
+@keyframes star-border-sweep-bottom {
+  0% {
+    transform: translateX(0);
+    opacity: 1;
+  }
+  100% {
+    transform: translateX(-100%);
+    opacity: 0;
+  }
+}
+
+/* The global reduce-motion rule flattens every animation to its last keyframe,
+   which here is opacity 0 -- the highlight would disappear rather than settle.
+   Drop the sweeps and hold a static teal ring, so the featured card still reads
+   as featured without anything moving. */
+@media (prefers-reduced-motion: reduce) {
+  .star-border-sweep {
+    display: none;
+  }
+  .star-border {
+    background: var(--accent-teal);
+  }
+}
+
+/* --- Cursor spotlight + tilt ----------------------------------------------
+   Adapted from React Bits' "Spotlight Card" and the tilt half of "Tilted Card"
+   (see components/SpotlightTilt.jsx, which publishes --mouse-x/--mouse-y and
+   writes the transform). Scoped to project and achievement cards: every rule
+   below is a descendant of .card-fx, so no other .card is affected.
+
+   data-fx is written by the component after it has checked (hover: hover) and
+   prefers-reduced-motion, so the CSS half cannot fire on a touch device or
+   under reduced motion even though the rules are always present. */
+.card-fx {
+  --mouse-x: 50%;
+  --mouse-y: 50%;
+  /* Eases each rAF transform write. Doing double duty, as in MagneticLink: it
+     turns per-frame writes into a follow rather than a snap, and carries the
+     card back to rest when the transform is cleared on mouseleave. */
+  transition: transform 0.18s ease-out;
+}
+
+.card-fx[data-fx="on"] {
+  will-change: transform;
+}
+
+.card-fx .card {
+  /* Anchor for the glow below. */
+  position: relative;
+}
+
+.card-fx .card::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  /* color-mix rather than a hand-mixed rgba() so the glow stays tied to the
+     token instead of duplicating #5dcaa5 in a second form. If a browser cannot
+     parse it the declaration is dropped and the card simply has no glow.
+     200px, not a percentage: the two card types differ by an order of magnitude
+     in height (~90px achievement rows vs ~1200px project cards), and a relative
+     size that reads as a spot on one reads as a wash over the other. */
+  background: radial-gradient(
+    circle 200px at var(--mouse-x) var(--mouse-y),
+    color-mix(in srgb, var(--accent-teal-bright) 16%, transparent),
+    transparent 70%
+  );
+  opacity: 0;
+  transition: opacity 0.35s ease;
+  pointer-events: none;
+}
+
+.card-fx[data-fx="on"]:hover .card::before {
+  opacity: 1;
+}
+
+/* The -4px lift is folded into the wrapper's tilt transform. Leaving
+   .card:hover's own translateY in place would stack the two for a doubled 8px
+   lift, and on the featured card it would slide the card up out of its star
+   ring (which the wrapper clips). The border-colour and box-shadow halves of
+   .card:hover still apply. Suppressed only while the effect is live, so touch
+   and reduced-motion keep the plain CSS lift. */
+.card-fx[data-fx="on"]:hover .card {
+  transform: none;
+}
+
 @keyframes blink-cursor {
   0%, 49% {
     opacity: 1;
@@ -140,7 +450,47 @@ input {
 
 .terminal-cursor {
   display: inline-block;
+  /* Used only by ChatWidget's "Thinking" indicator (TerminalHero uses its own
+     scoped .terminal-cursor-inline styled-jsx block with explicit colors and
+     !important overrides, so this fill change doesn't touch the hero). Same
+     accent green as the pulsing dot beside it, so the indicator reads as one
+     accent rather than two unrelated glyphs. */
+  color: var(--accent-teal-bright);
   animation: blink-cursor 1s step-end infinite;
+}
+
+/* ChatWidget "Thinking" indicator: a small accent-green dot that pulses to
+   signal active processing, alongside the existing cursor bar. Sits left of
+   the text, vertically centred via inline-flex, and falls back to a static
+   full-opacity dot under prefers-reduced-motion (the global reduce-motion
+   rule below also collapses the animation, but `animation: none` makes that
+   explicit and pins opacity at 1 instead of letting the inline style's
+   mid-animation value flicker). */
+.thinking-pulse-dot {
+  display: inline-block;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--accent-teal-bright);
+  margin-right: 8px;
+  vertical-align: 1px; /* visually centres 7px against the 12px text x-height */
+  animation: thinking-pulse 1.5s ease-in-out infinite;
+}
+
+@keyframes thinking-pulse {
+  0%, 100% { opacity: 0.4; }
+  50%      { opacity: 1;   }
+}
+
+/* The global `* { animation-duration: 0.01ms !important }` rule freezes the
+   pulse at whatever opacity the animation is mid-tick on, which can read as
+   a half-visible dot. `animation: none` pins it to the 50% / full-opacity
+   end value cleanly. */
+@media (prefers-reduced-motion: reduce) {
+  .thinking-pulse-dot {
+    animation: none;
+    opacity: 1;
+  }
 }
 
 .robot-companion-rail {
@@ -182,6 +532,339 @@ input {
   transition: opacity 0.3s ease;
 }
 
+/* --- CinematicNovaIntro chapter typography ---------------------------------
+   The chapter headings assemble word by word: each word span gets its own
+   animation-delay inline (index * stagger) and this shared keyframe. Lives here
+   rather than inline because keyframes can't be expressed in a style prop.
+   `both` fill is required -- without it a word is fully visible during its own
+   delay, which defeats the stagger. */
+@keyframes nova-word-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+    filter: blur(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+    filter: blur(0);
+  }
+}
+
+.nova-word {
+  display: inline-block;
+  animation: nova-word-in 0.55s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.nova-eyebrow,
+.nova-body {
+  animation: nova-word-in 0.6s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+/* The numeral needs its own keyframe: it rests at partial opacity, and
+   nova-word-in's `both` fill would hold it at the 1 it ends on, overriding the
+   inline 0.55 and making the flourish compete with the heading. */
+@keyframes nova-numeral-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+    filter: blur(6px);
+  }
+  to {
+    opacity: 0.55;
+    transform: translateY(0);
+    filter: blur(0);
+  }
+}
+
+.nova-numeral {
+  animation: nova-numeral-in 0.7s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+/* The rule draws itself after the last word lands. An animation rather than a
+   width transition because the block remounts on every revisit -- a transition
+   would have no prior value to animate from and the rule would simply be there. */
+@keyframes nova-rule-in {
+  from {
+    width: 0;
+  }
+}
+
+.nova-rule {
+  animation: nova-rule-in 0.7s ease both;
+}
+
+/* One-pass glint across the accent word -- Nova's origin is "a burst of light",
+   so the accent catches a highlight just after it lands. The gradient is 3x the
+   text width with the bright band in the middle third, so sweeping the position
+   from one end to the other drags that band across the letters exactly once.
+   The band sits in the middle third and the gradient's edges are flat teal, so
+   the pre-animation state (position 100%) and the settled state (position 0%)
+   both paint the word solid teal -- the glint exists only while the position is
+   in transit, which is the "one pass, then settle" the effect wants. `forwards`
+   fill is enough because the base rule already declares that same starting
+   position, so the word is correct teal during the ~1s delay too.
+
+   The transparent text-fill is guarded by @supports on BOTH the clip and the
+   fill property, since the fill is what reveals the gradient through the glyphs
+   -- applying it where the clip doesn't work would erase the word. The print and
+   forced-colors blocks below opt out for the two media where a background-based
+   text effect can't survive at all. */
+@keyframes nova-shimmer {
+  from {
+    background-position: 100% 0;
+  }
+  to {
+    background-position: 0 0;
+  }
+}
+
+@supports ((-webkit-background-clip: text) or (background-clip: text)) and
+  (-webkit-text-fill-color: transparent) {
+  .nova-accent-shimmer {
+    display: inline-block;
+    background-image: linear-gradient(
+      100deg,
+      var(--accent-teal-bright) 0%,
+      var(--accent-teal-bright) 40%,
+      var(--accent-teal-pale) 50%,
+      var(--accent-teal-bright) 60%,
+      var(--accent-teal-bright) 100%
+    );
+    background-size: 300% 100%;
+    background-position: 100% 0;
+    background-repeat: no-repeat;
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+    animation: nova-shimmer 1.1s ease-out forwards;
+  }
+}
+
+/* Print drops backgrounds by default, and the gradient is a background -- so a
+   printed page would show the accent word as a gap. Keep it as plain text. */
+@media print {
+  .nova-accent-shimmer {
+    animation: none;
+    background-image: none;
+    -webkit-text-fill-color: currentColor;
+  }
+}
+
+/* Forced-colours mode replaces the palette outright; a gradient-filled glyph
+   has no colour of its own there, so drop the effect and keep readable text. */
+@media (forced-colors: active) {
+  .nova-accent-shimmer {
+    animation: none;
+    background-image: none;
+    -webkit-text-fill-color: currentColor;
+  }
+}
+
+/* --- CinematicNovaIntro responsive layout ----------------------------------
+   Wide (the base rules): the canvas fills the section and each chapter's text
+   sits in a ~372px column on one flank. Narrow: the canvas is confined to a top
+   band and the text moves to a full-width band beneath it, so the two occupy
+   disjoint horizontal strips and cannot overlap however the copy grows.
+
+   Why below 1280: with a 6% inset, a 372px column and a centred
+   min(70vw, 720px) canvas, the clearance for a left-side chapter is
+   0.44W - 545, which crosses zero at ~1239px. (That formula reproduces the
+   measured gaps -- 88px at 1440, 18px at 1280.) 1280 is the lowest width that
+   measures clear side-by-side, so it's the last width that keeps that layout.
+
+   Expressed as media queries rather than a JS breakpoint deliberately. A JS
+   switch can only flip after mount, so the section paints in the wide layout
+   and re-lays out a frame later: measured CLS 1.0 at 390px, against 0.00007
+   for the same page laid out by CSS. Media queries apply on the first paint. */
+.nova-canvas-band,
+.nova-ghost-layer {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.nova-canvas {
+  width: min(70vw, 720px);
+}
+
+.nova-ghost-word {
+  font-size: 19vw;
+}
+
+.nova-chapter {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  max-width: 372px;
+}
+
+.nova-chapter--left {
+  left: 6%;
+}
+
+.nova-chapter--right {
+  right: 6%;
+}
+
+.nova-chapter-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 16px;
+}
+
+.nova-chapter-col {
+  min-width: 0;
+}
+
+.nova-num {
+  font-size: 56px;
+  margin-top: -6px;
+}
+
+.nova-heading-text {
+  font-size: 34px;
+}
+
+.nova-marks {
+  bottom: 48px;
+}
+
+/* Scroll cue: sits below the progress marks, centred. Deliberately quiet --
+   mono, muted, letterspaced, and small enough to read as chrome rather than
+   content. The chevron drifts a few px on a slow loop so it registers as an
+   invitation to move rather than a static label. Its opacity is driven from JS
+   (applyOutro) so it can fade out on scroll progress before the outro begins. */
+.nova-cue {
+  position: absolute;
+  bottom: 72px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 5px;
+  color: var(--text-muted);
+  pointer-events: none;
+  user-select: none;
+}
+
+.nova-cue-label {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+}
+
+@keyframes nova-cue-drift {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(3px);
+  }
+}
+
+.nova-cue-chevron {
+  animation: nova-cue-drift 1.9s ease-in-out infinite;
+}
+
+@media (max-width: 1279px) {
+  .nova-canvas-band,
+  .nova-ghost-layer {
+    bottom: auto;
+    height: 40%;
+  }
+
+  .nova-canvas {
+    width: min(56vw, 380px);
+  }
+
+  /* Larger in vw terms so the backdrop word still reads as oversized within
+     the shorter band. */
+  .nova-ghost-word {
+    font-size: 26vw;
+  }
+
+  .nova-chapter {
+    top: 40%;
+    bottom: 88px; /* reserves room for the progress marks */
+    transform: none;
+    max-width: none;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    text-align: center;
+  }
+
+  /* `side` stops being meaningful with one centred column: both flanks
+     collapse to the same full-width band. */
+  .nova-chapter--left,
+  .nova-chapter--right {
+    left: 22px;
+    right: 22px;
+  }
+
+  /* Numeral above the text rather than beside it, so the column keeps its
+     full width for the copy. */
+  .nova-chapter-row {
+    flex-direction: column;
+    align-items: center;
+    gap: 6px;
+    max-width: 520px;
+  }
+
+  /* Centres the teal rule under the centred text without needing a margin
+     override on the rule itself (which also carries its draw-in animation). */
+  .nova-chapter-col {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+  }
+
+  .nova-num {
+    font-size: 40px;
+    margin-top: 0;
+  }
+
+  /* 34px is tuned for the 372px flank and overpowers the narrower band. */
+  .nova-heading-text {
+    font-size: 28px;
+  }
+
+  .nova-marks {
+    bottom: 32px;
+  }
+
+  /* The stacked text band reserves 88px above the bottom edge, and the marks
+     move up to 32px, so the cue drops to sit in the gap between them rather
+     than reaching into the text band as it would at its wide offset. */
+  .nova-cue {
+    bottom: 52px;
+  }
+}
+
+/* The global reduce-motion rule collapses durations but leaves delays intact,
+   which would still hold each word invisible for its stagger. Zero them so the
+   whole block is simply present. */
+@media (prefers-reduced-motion: reduce) {
+  .nova-word,
+  .nova-numeral,
+  .nova-eyebrow,
+  .nova-body,
+  .nova-rule,
+  .nova-accent-shimmer {
+    animation-delay: 0s !important;
+  }
+}
+
 .tag {
   transition: transform 0.15s ease, border-color 0.15s ease, color 0.15s ease;
 }
@@ -190,4 +873,104 @@ input {
   transform: scale(1.06);
   border-color: var(--accent-teal-bright);
   color: var(--accent-teal-pale);
+}
+
+/* --- Skills marquee -------------------------------------------------------
+   Two renderings of the same data live in the DOM at once:
+
+   .skills-marquee-static  the original wrapped grid, WITH category labels.
+                           It is the accessible copy and the reduced-motion
+                           copy. In motion mode it is visually hidden rather
+                           than display:none, so the skills stay in the
+                           accessibility tree and remain findable by in-page
+                           search -- the marquee itself is aria-hidden because
+                           it repeats every tag four times.
+
+   .skills-marquee         the animated rows. Purely decorative.
+
+   Reduced-motion swaps which one is painted. It is a swap and not merely a
+   paused animation: a paused track sits at an arbitrary offset with tags
+   clipped off both edges, which is worse than not animating at all. */
+.skills-marquee-static {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+.skills-marquee-row {
+  overflow: hidden;
+  /* Tags fade out at both edges instead of being sliced mid-glyph, so the row
+     reads as continuing past the container rather than being cut off. */
+  -webkit-mask-image: linear-gradient(to right, transparent, #000 6%, #000 94%, transparent);
+  mask-image: linear-gradient(to right, transparent, #000 6%, #000 94%, transparent);
+}
+
+.skills-marquee-row + .skills-marquee-row {
+  margin-top: 8px;
+}
+
+.skills-marquee-track {
+  display: flex;
+  width: max-content;
+  animation-name: skills-marquee-scroll;
+  animation-timing-function: linear;
+  animation-iteration-count: infinite;
+  /* animation-duration is set inline, scaled to the row's tag count. */
+}
+
+.skills-marquee-track--reverse {
+  animation-direction: reverse;
+}
+
+/* Spacing via margin, NOT `gap`. With gap, the track measures
+   4N tags + (4N - 1) gaps, so shifting by exactly 25% of that width lands
+   0.25 of a gap short and the loop visibly stutters by ~1.5px every cycle.
+   A uniform right margin makes every tag occupy an identical slot, which makes
+   25% of the track exactly one copy. */
+.skills-marquee-track > .tag {
+  flex: 0 0 auto; /* flex items shrink by default; these must keep their width */
+  margin-right: 6px;
+  white-space: nowrap;
+}
+
+@keyframes skills-marquee-scroll {
+  from {
+    transform: translateX(0);
+  }
+  to {
+    /* Exactly one of the four copies. */
+    transform: translateX(-25%);
+  }
+}
+
+/* Reading a tag means stopping the row it is on. focus-within is included so
+   keyboard users get the same pause if these ever become focusable. */
+.skills-marquee-row:hover .skills-marquee-track,
+.skills-marquee-row:focus-within .skills-marquee-track {
+  animation-play-state: paused;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  /* Swap which copy is painted: static grid back to normal flow, marquee gone.
+     The global `* { animation-duration: 0.01ms !important }` rule would already
+     freeze the track, but frozen mid-scroll is not a usable layout. */
+  .skills-marquee-static {
+    position: static;
+    width: auto;
+    height: auto;
+    margin: 0;
+    overflow: visible;
+    clip: auto;
+    white-space: normal;
+  }
+
+  .skills-marquee {
+    display: none;
+  }
 }

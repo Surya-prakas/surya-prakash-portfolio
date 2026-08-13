@@ -41,6 +41,12 @@ yarn-error.log*
 *.tsbuildinfo
 next-env.d.ts
 
-# dev artifacts (scratch DOM dumps, probe screenshots)
+# dev artifacts (scratch DOM dumps, probe screenshots, profiling)
 /page.html
 /scripts/_*.png
+
+# scratch probe scripts and output -- these only reproduce a bug locally;
+# what's logged in their JSON output is in commits to the real components.
+/scripts/
+/garbage/
+*.log
