@@ -16,17 +16,25 @@ import path from "node:path";
 // Added https://*.spline.design and https://*.spline.dev to connect-src for
 // Spline's texture/WASM/CDN subdomains that weren't covered by just the base
 // prod.spline.design domain. Vercel deployment revealed these at runtime.
+//
+// Added https://www.gstatic.com for Spline's Draco 3D mesh decoder (WASM + JS)
+// fetched at runtime from Google's CDN. This is required for the robot to load.
+//
+// Added worker-src 'self' blob: for Spline's Web Worker instantiated from
+// blob URL (required for WASM decoding off-main-thread).
 const CSP = [
   "default-src 'self'",
   "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://prod.spline.design https://unpkg.com",
   "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
-  // Spline fetches scene JSON + WASM + textures from multiple CDN subdomains.
+  // Spline fetches scene JSON + WASM + textures + Draco decoder from multiple CDN subdomains.
   // NVIDIA/Resend are server-side only and excluded.
-  "connect-src 'self' https://prod.spline.design https://unpkg.com https://*.spline.design https://*.spline.dev",
+  "connect-src 'self' https://prod.spline.design https://unpkg.com https://*.spline.design https://*.spline.dev https://www.gstatic.com",
   "img-src 'self' data: blob: https:",
   // Spline uploads textures/canvas frames as blob: URLs.
   "media-src 'self' blob: data:",
   "font-src 'self' data:",
+  // Spline runtime spawns a Web Worker from a blob URL for off-main-thread WASM decoding.
+  "worker-src 'self' blob:",
   "frame-ancestors 'none'",
   "base-uri 'self'",
   "form-action 'self'",
