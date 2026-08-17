@@ -42,9 +42,12 @@ export const metadata = {
     // Same reasoning as openGraph.images -- the file convention supplies
     // twitter:image too.
   },
-  // favicon.ico is already present at app/favicon.ico and auto-detected. The
-  // other sizes (apple-touch-icon, 32x32, 16x16) still need generating from a
-  // Nova frame -- add an `icons` key here once those files exist.
+  manifest: "/site.webmanifest",
+  icons: {
+    icon: "/favicon.ico",
+    shortcut: "/favicon-16x16.png",
+    apple: "/apple-touch-icon.png",
+  },
 };
 
 // Person schema. Emitted as a plain <script> in the body rather than through
