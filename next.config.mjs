@@ -12,13 +12,17 @@ import path from "node:path";
 // loading the hero robot) and 'unsafe-inline' (Next.js inline styles + Spline
 // shaders). Both would require nonce-based CSP with Next 14's middleware, which
 // is a larger change — flag for Surya to review if locking down further.
+//
+// Added https://*.spline.design and https://*.spline.dev to connect-src for
+// Spline's texture/WASM/CDN subdomains that weren't covered by just the base
+// prod.spline.design domain. Vercel deployment revealed these at runtime.
 const CSP = [
   "default-src 'self'",
   "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://prod.spline.design https://unpkg.com",
   "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
-  // Spline fetches scene JSON + WASM from prod.spline.design and unpkg.com.
+  // Spline fetches scene JSON + WASM + textures from multiple CDN subdomains.
   // NVIDIA/Resend are server-side only and excluded.
-  "connect-src 'self' https://prod.spline.design https://unpkg.com",
+  "connect-src 'self' https://prod.spline.design https://unpkg.com https://*.spline.design https://*.spline.dev",
   "img-src 'self' data: blob: https:",
   // Spline uploads textures/canvas frames as blob: URLs.
   "media-src 'self' blob: data:",
