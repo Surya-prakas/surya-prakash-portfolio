@@ -13,6 +13,7 @@ import ContactForm from "../components/ContactForm";
 import MagneticLink from "../components/MagneticLink";
 import SpotlightTilt from "../components/SpotlightTilt";
 import StarBorder from "../components/StarBorder";
+import { LINKEDIN_URL, GITHUB_URL } from "./site";
 
 const projects = [
   {
@@ -642,7 +643,7 @@ export default function Home() {
             </MagneticLink>
             <MagneticLink>
               <a
-                href="https://www.linkedin.com/in/suryaprakash-458700228"
+                href={LINKEDIN_URL}
                 target="_blank"
                 rel="noopener noreferrer"
               >

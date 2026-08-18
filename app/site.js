@@ -29,3 +29,7 @@ export const SITE_TITLE = "Surya Prakash — AI & Full-Stack Developer";
 // (no "passionate", no "innovative") and matches the claims made there.
 export const SITE_DESCRIPTION =
   "Surya Prakash is an AI and Full-Stack Developer specializing in machine learning and fraud detection systems, currently pursuing an M.Tech in Software Engineering at JNTUH.";
+
+export const LINKEDIN_URL = "https://www.linkedin.com/in/surya-prakash-458700228";
+export const GITHUB_URL = "https://github.com/Surya-prakas";
+export const EMAIL = "mailto:gaddamsuryaprakash960@gmail.com";

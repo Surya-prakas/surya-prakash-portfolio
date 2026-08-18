@@ -75,6 +75,8 @@ export default function ChatWidget({ onThinking }) {
   const bottomRef = useRef(null);
   const inputRef = useRef(null);
   const panelRef = useRef(null);
+  // Track the element that had focus before the chat opened, so we can restore it
+  const previousFocusRef = useRef(null);
 
   // Only shown before the visitor's first message.
   const showSuggestions = !messages.some((m) => m.role === "user") && !loading;
@@ -93,7 +95,11 @@ export default function ChatWidget({ onThinking }) {
   // whether or not the panel is currently showing -- gating it on `open` would
   // mean the event only worked when the panel was already open.
   useEffect(() => {
-    const onOpen = () => setOpen(true);
+    const onOpen = () => {
+      // Store the currently focused element so we can restore focus on close
+      previousFocusRef.current = document.activeElement;
+      setOpen(true);
+    };
     window.addEventListener("nova:open-chat", onOpen);
     return () => window.removeEventListener("nova:open-chat", onOpen);
   }, []);
@@ -110,7 +116,13 @@ export default function ChatWidget({ onThinking }) {
     function onKeyDown(e) {
       if (e.key === "Escape") {
         e.stopPropagation();
+        // Restore focus to the element that had it before chat opened
+        const prev = previousFocusRef.current;
         setOpen(false);
+        if (prev && typeof prev.focus === "function") {
+          // Defer to next tick so focus happens after panel unmounts
+          requestAnimationFrame(() => prev.focus());
+        }
         return;
       }
       if (e.key !== "Tab") return;
@@ -328,7 +340,13 @@ export default function ChatWidget({ onThinking }) {
                 Clear
               </button>
               <button
-                onClick={() => setOpen(false)}
+                onClick={() => {
+                  const prev = previousFocusRef.current;
+                  setOpen(false);
+                  if (prev && typeof prev.focus === "function") {
+                    requestAnimationFrame(() => prev.focus());
+                  }
+                }}
                 aria-label="Close chat"
                 style={{
                   border: "none",

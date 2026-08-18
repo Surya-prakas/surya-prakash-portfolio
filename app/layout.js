@@ -10,6 +10,8 @@ import {
   SITE_NAME,
   SITE_TITLE,
   SITE_DESCRIPTION,
+  LINKEDIN_URL,
+  GITHUB_URL,
 } from "./site";
 
 export const metadata = {
@@ -63,8 +65,8 @@ const personSchema = {
   // structured data is worse than an absent field.
   ...(HAS_REAL_SITE_URL ? { url: SITE_URL } : {}),
   sameAs: [
-    "https://github.com/Surya-prakas",
-    "https://www.linkedin.com/in/suryaprakash-458700228",
+    GITHUB_URL,
+    LINKEDIN_URL,
   ],
   knowsAbout: [
     "Machine Learning",

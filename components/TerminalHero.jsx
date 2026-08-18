@@ -38,9 +38,11 @@ const SECTIONS = {
   contact: "Contact",
 };
 
+import { GITHUB_URL, LINKEDIN_URL } from "../app/site";
+
 const LINKS = {
-  github: "https://github.com/Surya-prakas",
-  linkedin: "https://www.linkedin.com/in/suryaprakash-458700228",
+  github: GITHUB_URL,
+  linkedin: LINKEDIN_URL,
 };
 
 // What `help` prints. The three easter eggs (`sudo hire surya`, `coffee`,

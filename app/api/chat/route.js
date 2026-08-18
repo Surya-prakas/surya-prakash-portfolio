@@ -17,6 +17,7 @@
 // /api/contact share one limiter (and one budget per IP). See that file for
 // the tradeoffs and the upgrade path.
 import { checkRateLimit, clientIp } from "../rate-limit.js";
+import { LINKEDIN_URL, GITHUB_URL } from "../../site";
 
 const PORTFOLIO_CONTEXT = `
 You are Nova, a friendly AI assistant embedded in Surya Prakash's personal
@@ -52,8 +53,8 @@ About Surya:
   Pandas, NumPy, FastAPI, Flask, React, Tailwind CSS, PostgreSQL, Docker, Git.
 - Currently looking for: Full-Time Software Engineer, AI/ML Engineer,
   Full-Stack Developer, or Research opportunities.
-- Contact: gaddamsuryaprakash960@gmail.com, GitHub at github.com/Surya-prakas,
-  LinkedIn at linkedin.com/in/suryaprakash-458700228.
+- Contact: gaddamsuryaprakash960@gmail.com, GitHub at ${GITHUB_URL},
+  LinkedIn at ${LINKEDIN_URL}.
 
 Replace or extend these facts as Surya's profile grows (e.g. once the
 research paper is published, or new projects/links are added).

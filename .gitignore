@@ -1,52 +1,55 @@
-# See https://help.github.com/articles/ignoring-files/ for more about ignoring files.
+# Dependencies
+node_modules/
+.pnp
+.pnp.js
 
-# dependencies
-/node_modules
-/.pnp
-.pnp.*
-.yarn/*
-!.yarn/patches
-!.yarn/plugins
-!.yarn/releases
-!.yarn/versions
+# Testing
+coverage/
 
-# testing
-/coverage
+# Next.js
+.next/
+out/
+build
 
-# next.js
-/.next/
-/out/
+# Production
+dist/
 
-# production
-/build
-
-# misc
+# Misc
 .DS_Store
 *.pem
 
-# debug
+# Debug/one-off test scripts at repo root
+test-*.js
+verify-*.js
+
+# Debug directories (create scripts/ for reusable tests instead)
+debug/
+scripts/
+
+# Favicon source package (extracted zip - actual favicons copied to app/ and public/)
+favicon_package/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Environment
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# Logs
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
-.pnpm-debug.log*
 
-# env files (can opt-in for committing if needed)
-.env*
-.env.local
-
-# vercel
+# Vercel
 .vercel
 
-# typescript
+# TypeScript
 *.tsbuildinfo
 next-env.d.ts
-
-# dev artifacts (scratch DOM dumps, probe screenshots, profiling)
-/page.html
-/scripts/_*.png
-
-# scratch probe scripts and output -- these only reproduce a bug locally;
-# what's logged in their JSON output is in commits to the real components.
-/scripts/
-/garbage/
-*.log
